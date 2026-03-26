@@ -2,44 +2,61 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-# إعداد الاتصال
+# إعدادات الاتصال الأساسية
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client = gspread.authorize(creds)
 
-# فتح الملف باستخدام ID الذي وضعته في الكود الخاص بك
-SPREADSHEET_ID = "1UxpWI4Bzv8OvU2Y7b64kC-oev96TkCzuu5-0CmAkYRg"
+# فتح ملف قاعدة البيانات الخاص بك
+SPREADSHEET_ID = "1e0tREOyfmZgQ_iCvWXJL2GpR_I4WfCpBlU7DYUclsfY"
 ss = client.open_by_key(SPREADSHEET_ID)
 
-# تعريف الأوراق للوصول السريع
+# تعريف الوصول للأوراق
 users_sheet = ss.worksheet("المستخدمين")
 bots_sheet = ss.worksheet("البوتات_المصنوعة")
-settings_sheet = ss.worksheet("إعدادات_المحتوى")
+content_sheet = ss.worksheet("إعدادات_المحتوى")
 logs_sheet = ss.worksheet("السجلات")
 
-def register_new_user(user_id, username):
-    """تسجيل مستخدم جديد في ورقة المستخدمين مع الإعدادات الافتراضية"""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # الترتيب: ID المستخدم، اسم المستخدم، تاريخ التسجيل، الحالة، نوع الاشتراك، رصيد... إلخ
-    user_data = [str(user_id), username, now, "نشط", "مجاني", 0, now, "ar", "Bot", "", 0]
-    users_sheet.append_row(user_data)
+# --- دوال التعامل مع المستخدمين ---
 
-def save_created_bot(owner_id, bot_type, bot_name, token):
-    """حفظ بيانات البوت الجديد في ورقة البوتات_المصنوعة"""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # الترتيب حسب أعمدة المصفوفة التي صممتها
-    bot_data = [str(owner_id), bot_type, bot_name, token, "متوقف", "", "", now, "", 0, 0, "جيد", "", "polling", "free", "", "true", ""]
-    bots_sheet.append_row(bot_data)
-
-def get_content_settings(bot_id):
-    """جلب إعدادات المحتوى لبوت معين"""
+def register_user(user_id, username):
+    """تسجيل مستخدم جديد مع كامل البيانات الافتراضية"""
     try:
-        cell = settings_sheet.find(str(bot_id))
-        return settings_sheet.row_values(cell.row)
+        # التأكد أولاً إذا كان المستخدم موجوداً
+        if not users_sheet.find(str(user_id)):
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # الأعمدة: ID، اسم، تاريخ، حالة، اشتراك، عدد بوتات، نشاط، لغة، مصدر، كود، رصيد
+            row = [str(user_id), username, now, "نشط", "مجاني", 0, now, "ar", "Bot", "", 0]
+            users_sheet.append_row(row)
+            return True
+    except gspread.exceptions.CellNotFound:
+        # إذا لم يجد المستخدم، نقوم بتسجيله (نفس الكود أعلاه)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        row = [str(user_id), username, now, "نشط", "مجاني", 0, now, "ar", "Bot", "", 0]
+        users_sheet.append_row(row)
+        return True
+    return False
+
+# --- دوال التحكم في المحتوى (لوحة الإدارة) ---
+
+def update_content_setting(bot_id, column_name, new_value):
+    """تحديث أي قيمة في إعدادات المحتوى (ترحيب، قوانين، إلخ)"""
+    # البحث عن سطر البوت
+    cell = content_sheet.find(str(bot_id))
+    if cell:
+        # جلب عناوين الأعمدة لمعرفة رقم العمود المستهدف
+        headers = content_sheet.row_values(1)
+        col_index = headers.index(column_name) + 1
+        content_sheet.update_cell(cell.row, col_index, new_value)
+        return True
+    return False
+
+def get_bot_config(bot_id):
+    """جلب كل إعدادات البوت في قاموس (Dictionary) لسهولة الاستخدام"""
+    try:
+        cell = content_sheet.find(str(bot_id))
+        values = content_sheet.row_values(cell.row)
+        headers = content_sheet.row_values(1)
+        return dict(zip(headers, values))
     except:
         return None
-
-def add_log(bot_id, log_type, message):
-    """إضافة سجل جديد في ورقة السجلات"""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logs_sheet.append_row([str(bot_id), log_type, message, now])
