@@ -28,6 +28,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
     
+    # أضف هذا الجزء لملف main.py تحت handle_message
+
+async def owner_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """لوحة تحكم خاصة بك أنت (المطور والمالك للمصنع)"""
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("📊 إحصائيات البوتات", callback_data="stats_all")],
+        [InlineKeyboardButton("📢 إذاعة للمشتركين", callback_data="broadcast_owners")],
+        [InlineKeyboardButton("🔄 تحديث السيرفر", callback_data="restart_factory")]
+    ]
+    await update.message.reply_text("🛠 **لوحة تحكم المطور**\nإدارة المصنع والمشتركين:", 
+                                   reply_markup=InlineKeyboardMarkup(keyboard))
+
+# معالجة الضغط على الأزرار في لوحة التحكم
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "restart_factory":
+        await query.edit_message_text("🔄 جاري إعادة تشغيل المصنع لتطبيق التحديثات...")
+        os.execv(sys.executable, ['python'] + sys.argv)
+
+    
+    
+    
     # --- قسم المستخدم العادي ---
     if text == "➕ إنشاء بوت":
         keyboard = [["📩 تواصل"], ["🛡 حماية"], ["🎓 منصة تعليمية"], ["🛒 متجر"]]
